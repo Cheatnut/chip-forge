@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="UART2MEM Milestone 1 单字读写闭环的功能、串口协议、AXI 接口和验收规格。">
+  <title>Milestone 1 设计规格 · my_uart2mem</title>
+  <style>
+    /* 颜色、间距与字体集中定义，文档可直接离线打开。 */
+    :root {
+      color-scheme: light;
+      --ink: #172436;
+      --muted: #4f6074;
+      --accent: #1d5b8e;
+      --accent-soft: #edf5fb;
+      --line: #d9e2eb;
+      --paper: #ffffff;
+      --canvas: #f3f6f9;
+      --code-bg: #172b40;
+      --code-fg: #eaf2fa;
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--canvas);
+      font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.75;
+    }
+    a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+    a:focus-visible { outline: 3px solid #cf752c; outline-offset: 3px; }
+    code, pre, .mono { font-family: Consolas, "Cascadia Mono", "Courier New", monospace; }
+    code { color: #17496f; overflow-wrap: anywhere; }
+    pre {
+      margin: 14px 0;
+      padding: 16px 18px;
+      overflow-x: auto;
+      color: var(--code-fg);
+      background: var(--code-bg);
+      border-radius: 10px;
+      font-size: 14px;
+      line-height: 1.75;
+    }
+    pre code { color: inherit; overflow-wrap: normal; }
+    .page { width: min(100% - 48px, 1300px); margin: 0 auto; }
+    .masthead { padding: 35px 0 28px; border-bottom: 1px solid var(--line); }
+    .eyebrow {
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .11em;
+      text-transform: uppercase;
+    }
+    h1 { margin: 8px 0 10px; font-size: clamp(30px, 3.4vw, 44px); line-height: 1.2; letter-spacing: -.025em; }
+    .lead { max-width: 850px; margin: 0; color: var(--muted); font-size: 17px; }
+    .meta { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 20px; }
+    .pill {
+      padding: 4px 11px;
+      color: #24455f;
+      background: var(--accent-soft);
+      border: 1px solid #d3e5f1;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .layout { display: grid; grid-template-columns: 215px minmax(0, 1fr); gap: 28px; padding: 28px 0 60px; align-items: start; }
+    .sidebar {
+      position: sticky;
+      top: 20px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--paper);
+    }
+    .sidebar strong { display: block; padding: 0 8px 6px; color: var(--muted); font-size: 13px; }
+    .sidebar a { display: block; padding: 6px 8px; border-radius: 7px; text-decoration: none; font-size: 14px; }
+    .sidebar a:hover { background: var(--accent-soft); }
+    main { min-width: 0; }
+    .card {
+      margin-bottom: 18px;
+      padding: 29px 32px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--paper);
+      scroll-margin-top: 18px;
+    }
+    .section-head { display: flex; gap: 14px; align-items: baseline; margin-bottom: 11px; }
+    .section-no { color: var(--accent); font: 700 13px/1.4 Consolas, monospace; }
+    h2 { margin: 0; font-size: 23px; line-height: 1.35; letter-spacing: -.01em; }
+    h3 { margin: 25px 0 8px; font-size: 17px; }
+    p { margin: 9px 0 13px; }
+    ul, ol { margin: 9px 0 14px; padding-left: 1.5em; }
+    li { margin: 5px 0; }
+    .muted { color: var(--muted); }
+    .callout { margin: 15px 0; padding: 13px 17px; border-left: 3px solid var(--accent); background: var(--accent-soft); border-radius: 0 8px 8px 0; }
+    .table-wrap { overflow-x: auto; margin: 14px 0; border: 1px solid var(--line); border-radius: 9px; }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: #314a63; background: #f5f8fb; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    .flow { display: flex; align-items: center; width: max-content; min-width: 100%; margin: 0; padding: 0; list-style: none; }
+    .flow li { display: flex; align-items: center; margin: 0; }
+    .flow li:not(:last-child)::after { content: "→"; margin: 0 9px; color: var(--muted); font-weight: 700; }
+    .flow span { display: block; padding: 8px 11px; color: #214b6d; background: #f0f6fb; border: 1px solid #d2e2ef; border-radius: 8px; font-size: 14px; white-space: nowrap; }
+    .flow-wrap { padding: 7px 0; overflow-x: auto; }
+    .checklist { list-style: none; padding: 0; counter-reset: acceptance; }
+    .checklist li { display: grid; grid-template-columns: 35px minmax(0, 1fr); gap: 10px; margin: 12px 0; }
+    .checklist li::before { counter-increment: acceptance; content: counter(acceptance, decimal-leading-zero); color: var(--accent); font: 700 13px/1.8 Consolas, monospace; }
+    .sources li { overflow-wrap: anywhere; }
+    footer { padding: 0 0 32px; color: var(--muted); font-size: 13px; }
+    @media (max-width: 800px) {
+      .page { width: min(100% - 28px, 1300px); }
+      .layout { grid-template-columns: 1fr; gap: 14px; padding-top: 18px; }
+      .sidebar { position: static; }
+      .sidebar nav { display: flex; flex-wrap: wrap; gap: 2px 6px; }
+      .card { padding: 22px 19px; }
+      .masthead { padding-top: 26px; }
+    }
+    @media print {
+      body { background: #fff; }
+      .page { width: 100%; }
+      .layout { display: block; padding: 0; }
+      .sidebar { display: none; }
+      .card { margin: 0; padding: 20px 0; border: 0; break-inside: avoid; }
+      pre { color: #111; background: #f3f5f7; border: 1px solid #bbb; }
+      pre code { color: #111; }
+      footer { padding-top: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="masthead">
+      <div class="eyebrow">MY_UART2MEM / ENGINEERING SPECIFICATION</div>
+      <h1>Milestone 1 设计规格</h1>
+      <p class="lead">打通 PC、UART、AXI 和 FPGA 内部 RAM，完成一个对齐 32 位字的写入与读回。</p>
+      <div class="meta">
+        <span class="pill">规格 v1.0 · 待实现</span>
+        <span class="pill">PYNQ-Z2</span>
+        <span class="pill">115200 · 8N1</span>
+        <span class="pill">单拍 AXI 读写</span>
+      </div>
+    </header>
+
+    <div class="layout">
+      <aside class="sidebar">
+        <strong>文档导航</strong>
+        <nav aria-label="文档目录">
+          <a href="#scope">01 · 目标与范围</a>
+          <a href="#architecture">02 · 系统与端口</a>
+          <a href="#protocol">03 · UART 命令</a>
+          <a href="#modules">04 · 模块与数据交付</a>
+          <a href="#axi">05 · AXI 与存储器</a>
+          <a href="#reset">06 · 复位与配置</a>
+          <a href="#acceptance">07 · 验收条件</a>
+          <a href="#references">08 · 参考依据</a>
+        </nav>
+      </aside>
+
+      <main>
+        <section class="card" id="scope">
+          <div class="section-head"><span class="section-no">01</span><h2>目标与范围</h2></div>
+          <p>PC 通过 CH343 USB 转串口发送命令，FPGA 解析后通过 AXI 访问内部 RAM。一次命令访问一个按 4 字节对齐的 32 位字；读操作把该字的 4 个字节发送回 PC。</p>
+          <div class="callout"><strong>完成标志</strong>　用原工程命令格式写入 <code>0x87654321</code>，再读回 <code>21 43 65 87</code>。</div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>项目</th><th>Milestone 1 要求</th></tr></thead>
+              <tbody>
+                <tr><td>操作</td><td><code>0x10</code> 写 32 位字，<code>0x11</code> 读 32 位字；长度字段固定为 <code>0x04</code>。</td></tr>
+                <tr><td>RAM</td><td>默认 64 KiB，按字节寻址；支持地址 <code>0x00000000</code> 至 <code>0x0000FFFC</code> 中的 4 字节对齐地址。</td></tr>
+                <tr><td>AXI</td><td>单拍 32 位读写，使用 <code>AW/W/B</code> 与 <code>AR/R</code> 通道。</td></tr>
+                <tr><td>串口</td><td>默认 115200 波特，8 个数据位、无校验、1 个停止位；读回 4 个数据字节。</td></tr>
+                <tr><td>缓冲</td><td>接收和发送各使用一个 FIFO，默认每项 8 位、深度 8 项。</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="muted">本阶段的兼容范围以以上有效命令为准。GPIO、状态寄存器、可变长度、非对齐访问、部分字节写入和越界地址的兼容行为留到后续阶段确认与实现。</p>
+        </section>
+
+        <section class="card" id="architecture">
+          <div class="section-head"><span class="section-no">02</span><h2>系统与端口</h2></div>
+          <p>命令路径按图从左到右流动，读结果沿第二行回到 PC。两条路径使用不同的 FIFO。</p>
+          <div class="flow-wrap" role="img" aria-label="命令路径：PC 经 UART 接收器、接收 FIFO、命令解析器和 AXI master 访问 AXI RAM。">
+            <ol class="flow"><li><span>PC / CH343</span></li><li><span>UART RX</span></li><li><span>RX FIFO</span></li><li><span>命令解析</span></li><li><span>AXI master</span></li><li><span>AXI RAM</span></li></ol>
+          </div>
+          <div class="flow-wrap" role="img" aria-label="读回路径：AXI RAM 经 AXI master、结果拆字节、发送 FIFO 和 UART 发送器返回 PC。">
+            <ol class="flow"><li><span>AXI RAM</span></li><li><span>AXI master</span></li><li><span>结果拆字节</span></li><li><span>TX FIFO</span></li><li><span>UART TX</span></li><li><span>PC / CH343</span></li></ol>
+          </div>
+          <h3>板级接口</h3>
+          <p>以下命名与原 PYNQ-Z2 顶层保持一致。方向以 FPGA 为参照，管脚以原工程约束为依据。</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>端口</th><th>方向</th><th>用途</th><th>PYNQ-Z2 管脚</th></tr></thead>
+              <tbody>
+                <tr><td><code>board_clk_i</code></td><td>输入</td><td>板上 125 MHz 时钟，经时钟模块产生 50 MHz 逻辑时钟。</td><td><code>H16</code></td></tr>
+                <tr><td><code>board_rst_i</code></td><td>输入</td><td>高电平有效复位，连接板上 BTN0。</td><td><code>D19</code></td></tr>
+                <tr><td><code>uart_txd_i</code></td><td>输入</td><td>来自 CH343 的 TXD，进入 FPGA UART 接收器。</td><td><code>Y17</code></td></tr>
+                <tr><td><code>uart_rxd_o</code></td><td>输出</td><td>来自 FPGA UART 发送器，连接 CH343 的 RXD。</td><td><code>Y16</code></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>上述引脚的电气标准为 <code>LVCMOS33</code>。FPGA 内部使用统一的 50 MHz 逻辑时钟；PC 串口方向的命名以 CH343 一侧为参照。</p>
+        </section>
+
+        <section class="card" id="protocol">
+          <div class="section-head"><span class="section-no">03</span><h2>UART 与命令协议</h2></div>
+          <p>串口空闲为高电平。每个字节由 1 个低电平起始位、8 个数据位和 1 个高电平停止位组成；数据位低位先发。默认配置下，50 MHz 时钟除以 115200 的整数计数为 434 个周期，约 8.68 μs / bit。</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>操作</th><th>发送字节</th><th>FPGA 串口返回</th></tr></thead>
+              <tbody>
+                <tr><td>写</td><td><code>10 04 A3 A2 A1 A0 D0 D1 D2 D3</code></td><td>不发送写应答字节。</td></tr>
+                <tr><td>读</td><td><code>11 04 A3 A2 A1 A0</code></td><td><code>D0 D1 D2 D3</code>，共 4 个字节，无额外帧头。</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p><code>A3…A0</code> 是 32 位地址，从高字节到低字节发送；<code>D0…D3</code> 是 32 位数据，从低字节到高字节发送。这里说的是<strong>字节顺序</strong>，每个 UART 字节内部仍按低位先发。</p>
+          <pre><code>地址 0x00000004  →  00 00 00 04
+数据 0x87654321  →  21 43 65 87
+
+写入  10 04 00 00 00 04 21 43 65 87
+读取  11 04 00 00 00 04
+返回  21 43 65 87</code></pre>
+          <p>有效写命令后允许紧接一条有效读命令，无需等待写应答或插入固定延时；读取的 4 个返回字节到齐后再发起下一条读命令。无穷长连续报文、FIFO 溢出和 AXI 无限期不响应时的处理不属于本阶段保证范围。</p>
+          <p class="muted">对未知操作码、长度不是 <code>04</code>、非对齐或超范围地址，本阶段不规定响应与存储器效果，主机不应发送这类命令。</p>
+        </section>
+
+        <section class="card" id="modules">
+          <div class="section-head"><span class="section-no">04</span><h2>模块职责与数据交付</h2></div>
+          <p>下表规定边界和职责。子模块的具体端口命名在逐个模块设计时确定，数据方向与交付条件需满足本规格。</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>模块</th><th>输入</th><th>输出与职责</th></tr></thead>
+              <tbody>
+                <tr><td>UART RX</td><td>串口输入、逻辑时钟与复位</td><td>同步异步输入，按波特率采样，输出接收字节及有效标志。</td></tr>
+                <tr><td>RX FIFO</td><td>UART 接收字节及有效标志</td><td>缓存字节，按接收顺序交给命令解析器；提供可接收 / 数据有效状态。</td></tr>
+                <tr><td>命令解析与响应整理</td><td>RX FIFO 字节、AXI 完成及读数据</td><td>解析命令、长度、地址和写数据；读操作将 32 位结果拆成 4 个低字节先发的字节。</td></tr>
+                <tr><td>AXI master</td><td>解析后的读写请求、地址和写数据</td><td>产生单拍 AXI 请求，等待相应写响应或读数据，再向解析逻辑报告完成。</td></tr>
+                <tr><td>AXI RAM</td><td>AXI 请求</td><td>按字节地址访问 32 位存储字，返回单拍读数据或写响应。</td></tr>
+                <tr><td>TX FIFO / UART TX</td><td>整理后的返回字节</td><td>缓存待发字节，按顺序编码成 UART 帧并输出到 PC。</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <h3>字节通道约定</h3>
+          <p>字节交付包含 <code>data[7:0]</code>、<code>valid</code> 和 <code>ready</code> 的含义。在逻辑时钟上升沿两者同时为 1 时完成交付；发送方在 <code>valid=1</code>、<code>ready=0</code> 期间保持数据与 <code>valid</code> 稳定。FIFO 满时可以暂不接收，空时不提供有效输出。</p>
+          <p>串口引脚没有暂停 PC 发送的握手线。M1 必须满足第 3 节的有效命令发送方式，并用足够的内部缓冲与处理能力保持顺序。</p>
+        </section>
+
+        <section class="card" id="axi">
+          <div class="section-head"><span class="section-no">05</span><h2>AXI 与 RAM 约定</h2></div>
+          <p>命令解析一次只发起一笔读或写事务。此阶段实现系统使用的 AXI 单拍访问子集，地址和数据在 master 一侧为 32 位，RAM 使用低 16 位字节地址。</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>通道</th><th>数据 / 控制方向</th><th>交付内容</th></tr></thead>
+              <tbody>
+                <tr><td><code>AW</code></td><td>master → RAM</td><td><code>AWADDR</code>、<code>AWVALID</code> 等；RAM 返回 <code>AWREADY</code>。</td></tr>
+                <tr><td><code>W</code></td><td>master → RAM</td><td><code>WDATA</code>、<code>WSTRB</code>、<code>WLAST</code>、<code>WVALID</code>；RAM 返回 <code>WREADY</code>。</td></tr>
+                <tr><td><code>B</code></td><td>RAM → master</td><td><code>BVALID</code>、<code>BRESP</code>、<code>BID</code>；master 返回 <code>BREADY</code>。</td></tr>
+                <tr><td><code>AR</code></td><td>master → RAM</td><td><code>ARADDR</code>、<code>ARVALID</code> 等；RAM 返回 <code>ARREADY</code>。</td></tr>
+                <tr><td><code>R</code></td><td>RAM → master</td><td><code>RDATA</code>、<code>RVALID</code>、<code>RRESP</code>、<code>RID</code>、<code>RLAST</code>；master 返回 <code>RREADY</code>。</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <ul>
+            <li>通道在上升沿 <code>VALID &amp;&amp; READY</code> 时交付。发送方在等待 <code>READY</code> 期间保持对应的 <code>VALID</code> 和载荷稳定。</li>
+            <li><code>AW</code> 和 <code>W</code> 分别握手；master 分别保持与完成这两个通道，能够处理地址或数据先到达的情况。RAM 在收到两者后才返回写响应。</li>
+            <li><code>AWLEN = ARLEN = 0</code>，<code>AWSIZE = ARSIZE = 3'b010</code>，<code>AWBURST = ARBURST = 2'b01</code>，<code>AWID = ARID = 0</code>。</li>
+            <li>一次写入使用 <code>WSTRB = 4'b1111</code>、<code>WLAST = 1</code>。正常 RAM 读写返回 <code>OKAY</code>，单拍读返回 <code>RLAST = 1</code>。</li>
+            <li>master 完成写地址和数据交付后等待 <code>B</code> 握手；读地址交付后等待 <code>R</code> 握手。AXI 就绪和响应允许延迟。</li>
+          </ul>
+          <h3>存储组织</h3>
+          <p>默认 RAM 为 <code>2^16</code> 字节，即 16,384 个 32 位字。地址 <code>0x00000004</code> 对应第 1 个字，地址低两位为字内字节偏移；本阶段只接收偏移为 <code>00</code> 的请求。复位不要求清空 RAM，初始内容不作保证。</p>
+        </section>
+
+        <section class="card" id="reset">
+          <div class="section-head"><span class="section-no">06</span><h2>复位与配置</h2></div>
+          <ul>
+            <li><code>board_rst_i</code> 为高时进入复位。复位清空收发 FIFO 与命令处理状态，UART TX 返回高电平空闲状态，未完成事务退出处理。</li>
+            <li>复位释放后重新从命令起始字节接收。复位打断进行中的 RAM 写入时，本规格不保证该次写入是否生效。</li>
+            <li>逻辑时钟频率、串口波特率、FIFO 数据宽度与深度、RAM 地址宽度使用参数或集中配置；默认值分别为 50 MHz、115200、8 位 × 8 项和 16 位。协议操作码与 AXI 字段使用具名常量。</li>
+            <li>工程脚本与文档使用相对项目路径或可传入参数，不依赖某台电脑的固定绝对路径。</li>
+          </ul>
+        </section>
+
+        <section class="card" id="acceptance">
+          <div class="section-head"><span class="section-no">07</span><h2>验收条件</h2></div>
+          <p>以下条件描述可观察结果和模块接口行为，未运行或未实现时不视为通过。</p>
+          <ol class="checklist">
+            <li><div><strong>单字写读。</strong> 在 <code>0x00000004</code> 写入 <code>0x87654321</code> 后读同一地址，串口按序收到 <code>21 43 65 87</code>。</div></li>
+            <li><div><strong>写后立即读。</strong> 连续发送上面的完整写命令和读命令，写命令没有应答，读命令返回 4 个正确字节。</div></li>
+            <li><div><strong>地址与数据区分。</strong> 分别写入地址 <code>0x00000000</code> 和 <code>0x00000004</code>，各自读回所写值；覆盖同一地址后读回新值。</div></li>
+            <li><div><strong>边界对齐地址。</strong> 默认地址配置下，在 <code>0x0000FFFC</code> 写入后能正确读回，不影响地址 <code>0x00000000</code>。</div></li>
+            <li><div><strong>握手等待。</strong> 地址、写数据或读数据通道发生有限周期的接收延迟时，待交付内容保持稳定，交付一次且结果正确；覆盖 AW 和 W 先后握手的情况。</div></li>
+            <li><div><strong>FIFO 顺序。</strong> 空、非空和满状态符合对应 <code>valid</code>、<code>ready</code>；被接收的字节以进入顺序输出。</div></li>
+            <li><div><strong>复位恢复。</strong> 复位后 UART TX 为空闲高电平，FIFO 和命令处理状态回到初始状态；重新发送有效写读命令可成功完成。</div></li>
+          </ol>
+        </section>
+
+        <section class="card" id="references">
+          <div class="section-head"><span class="section-no">08</span><h2>参考依据</h2></div>
+          <p>本规格依据已确认的项目目录和 Milestone 1 范围，并对照同级原工程的以下源码整理。路径以包含两个工程的父目录为起点。</p>
+          <ul class="sources">
+            <li><code>lab1_uart2mem/labs2026/scripts/run/uart_bus_interface.py</code>：读写命令、长度和字节顺序。</li>
+            <li><code>lab1_uart2mem/labs2026/deps/dbg_bridge/src_v/dbg_bridge.v</code>：命令解析及单拍 AXI 访问参数。</li>
+            <li><code>lab1_uart2mem/labs2026/hw/fpga/uart2mem/pynqz2/top.v</code> 与 <code>fpga_top.v</code>：时钟、串口和 RAM 连接。</li>
+            <li><code>lab1_uart2mem/labs2026/hw/fpga/uart2mem/pynqz2/pynqz2_v1.0.xdc</code>：PYNQ-Z2 引脚与电气标准。</li>
+          </ul>
+        </section>
+      </main>
+    </div>
+    <footer>my_uart2mem · Milestone 1 设计规格 · 自包含 HTML 文档</footer>
+  </div>
+</body>
+</html>
